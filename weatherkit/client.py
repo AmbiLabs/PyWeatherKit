@@ -14,14 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import requests
-from weatherkit.token import generate_token
+from weatherkit.token import generate_token, Token
 from time import time
+from dataclasses import dataclass
+import typing
 
 
 class TokenExpiredError(Exception):
     pass
 
-
+@dataclass
 class WKClient:
     # Generates a WKClient that can connect to WeatherKit.
     # *key_path* should be the path to a private key file.
@@ -29,8 +31,12 @@ class WKClient:
     # *team_id* is the 10 digit Apple Developer team id
     # *key_id* is the 10 digit id associated with the private key.
     # *service_id* is the custom id you specified when you created the service.
-    def __init__(self, team_id: str, service_id: str, key_id: str, key_path: str, expiry: int = 3600):
-        self.token = generate_token(team_id, service_id, key_id, key_path, expiry)
+    team_id: str
+    service_id: str
+    key_id: str
+    key_path: str
+    expiry: int = 3600
+    token: Token = None
 
     # Returns the current weather for *latitude* and *longitude*.
     # *latitude* and *longitude* are floats.
@@ -38,10 +44,10 @@ class WKClient:
     # *timezone* is a string representing the timezone to use.
     # *dataSets* is a list of strings representing the data sets to return which can include:
     # currentWeather, forecastDaily, forecastHourly, forecastNextHour, or weatherAlerts
-    def get_weather(self, latitude: float, longitude: float, language: str = "en", timezone: str = "America/New_York",
-                    dataSets: list[str] = ["currentWeather", "forecastDaily"]) -> dict:
-        if self.token.expiry_time < time():
-            raise TokenExpiredError("Token has expired")
+    def get_weather(self, latitude: float, longitude: float, language: str = "en", timezone: str = "America/Swift_Current",
+                    dataSets: typing.List[str] = ["currentWeather", "forecastHourly"]) -> dict:
+        if not self.token or self.token.expiry_time < time():
+            self.token = generate_token(self.team_id, self.service_id, self.key_id, self.key_path, self.expiry)
         url = f"https://weatherkit.apple.com/api/v1/weather/{language}/{latitude}/{longitude}"
         headers = {
             "Authorization": f"Bearer {self.token.token}"
